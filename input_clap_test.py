@@ -1,6 +1,4 @@
-import librosa
 import pyaudio
-import matplotlib.pyplot as plt
 import numpy as np
 
 CHUNK = 1024*2  # Number of audio frames per buffer
