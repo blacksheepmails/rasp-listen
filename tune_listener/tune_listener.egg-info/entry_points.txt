@@ -1,0 +1,3 @@
+[console_scripts]
+tune-listener = tune_listener.__main__:main
+

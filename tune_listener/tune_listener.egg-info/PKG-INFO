@@ -1,0 +1,12 @@
+Metadata-Version: 1.2
+Name: tune-listener
+Version: 0.1
+Summary: Listens to a melody and triggers a command when it matches a tune
+Home-page: UNKNOWN
+Author: Your Name
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Requires-Python: >=3.6
