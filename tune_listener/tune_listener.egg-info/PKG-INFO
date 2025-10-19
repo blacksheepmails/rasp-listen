@@ -1,12 +1,12 @@
 Metadata-Version: 1.2
 Name: tune-listener
-Version: 0.1
-Summary: Listens to a melody and triggers a command when it matches a tune
+Version: 0.1.0
+Summary: Listen for a short tune and execute a shell command.
 Home-page: UNKNOWN
-Author: Your Name
 License: UNKNOWN
 Description: UNKNOWN
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6

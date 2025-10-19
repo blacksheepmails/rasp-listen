@@ -3,8 +3,11 @@ import librosa
 import pyaudio
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import Button
 import subprocess
 import sys
+from scipy.signal import find_peaks
 
 def int16_to_float32(int16):
     float32 = int16.astype(np.float32)
@@ -22,6 +25,7 @@ def add_note(note, notes):
 def debug(m):
   if args.debug:
     print(m)
+
 
 CHUNK = 1024*2  # Number of audio frames per buffer
 RATE = 22050  # Sample rate (samples per second)
@@ -54,55 +58,82 @@ stream = p.open(format=pyaudio.paInt16, #paInt16 or paUInt8 for lower quality, n
               input=True,  # Set to True for input (microphone)
               frames_per_buffer=CHUNK)
 
-print("Recording...")
-try:
-  notes = []
-  note = [0]
-  while True:
-      chunk = stream.read(CHUNK, exception_on_overflow = False)
-      data = np.frombuffer(chunk, dtype=np.int16)
-      spec = librosa.stft(np.array([int16_to_float32(x) for x in data]))
-      single_frame = [max(np.abs(p)) for p in spec]
-      if max(single_frame) < VOLUME_THRESHOLD:
-        if len(note) >= NOTE_LENGTH:
-            add_note(note, notes)
-        note = [0]
-      else:
-        i = single_frame.index(max(single_frame))
-        f = librosa.fft_frequencies()[i]
-        if abs(1 - note[-1]/f) < NOTE_DRIFT_THRESHOLD:
-          debug(f'f:{f}, err:{abs(1 - note[-1]/f):.3f}')
-          note.append(f)
-        else:
-          if len(note) >= NOTE_LENGTH:
-            add_note(note, notes)
-          note = [f]
-      if len(notes) >= len(tune):
-        match_tune = True
-        latest_notes = notes[-1*len(tune):]
-        for i in range(1, len(tune)):
-          if abs(latest_notes[i]/latest_notes[0] - solfege_to_ratio(tune[i])/solfege_to_ratio(tune[0])) > ERR:
-            match_tune = False
-            break
-        if match_tune == True:
-          result_shell = subprocess.run(args.do, shell=True, capture_output=True, text=True)
-          print("Shell Output:", result_shell.stdout)
-          debug('YAY')
-          notes = []
+
+notes = []
+note = [0]
+
+# Plot real time input frequencies
+fig, axs = plt.subplots(1, 1, figsize=(16, 5))
+line, = axs.plot([], []) # Initialize an empty line object
+plt.xticks(range(0,4000,200)) 
+overtones = axs.vlines([],0,5)
+def update(_):
+  global overtones
+  global notes
+  global note
+
+  # read more data
+  chunk = stream.read(CHUNK, exception_on_overflow = False)
+  data = np.frombuffer(chunk, dtype=np.int16)
+  spec = librosa.stft(np.array([int16_to_float32(x) for x in data]))
+  single_frame = [max(np.abs(p)) for p in spec]
+  peaks, _ = find_peaks(single_frame[:400], prominence=1)
+  
+
+  # try match tune
+  if len(peaks) == 0:
+    if len(note) >= NOTE_LENGTH:
+        add_note(note, notes)
+    note = [0]
+  else:
+    f = librosa.fft_frequencies()[peaks[0]]
+    if abs(1 - note[-1]/f) < NOTE_DRIFT_THRESHOLD:
+      debug(f'f:{f}, err:{abs(1 - note[-1]/f):.3f}')
+      note.append(f)
+    else:
+      if len(note) >= NOTE_LENGTH:
+        add_note(note, notes)
+      note = [f]
+  if len(notes) >= len(tune):
+    match_tune = True
+    latest_notes = notes[-1*len(tune):]
+    for i in range(1, len(tune)):
+      if abs(latest_notes[i]/latest_notes[0] - solfege_to_ratio(tune[i])/solfege_to_ratio(tune[0])) > ERR:
+        match_tune = False
+        break
+    if match_tune == True:
+      result_shell = subprocess.run(args.do, shell=True, capture_output=True, text=True)
+      print("Shell Output:", result_shell.stdout)
+      debug('YAY')
+      notes = []
+  if max(data) > CLAP_THRESHOLD:
+    print('clap')
+
+  # update plot
+  overtones.remove()
+  line.set_data(librosa.fft_frequencies()[:400], single_frame[:400])
+  axs.relim() # Recalculate limits
+  axs.autoscale_view() # Autoscale view to new data
+  overtones = axs.vlines([librosa.fft_frequencies()[peak] for peak in peaks], ymin=0, ymax=[single_frame[peak] for peak in peaks], linestyle='dotted', color='red')
+  return line, overtones
+ani = FuncAnimation(fig, update)
+
+# Add a pause/resume button
+button_ax = fig.add_axes([0.7, 0.01, 0.25, 0.05])
+button = Button(button_ax, 'PAUSE')
+def on_button_clicked(event):
+  global fig
+  if button.label.get_text() == 'PAUSE':
+    button.label.set_text('RESUME')
+    ani.event_source.stop()
+  else:
+    ani.event_source.start()
+    button.label.set_text('PAUSE')
+  fig.canvas.draw_idle()
+button.on_clicked(on_button_clicked)
 
 
-      # plt.plot(single_frame[:10000])
-      # plt.show()
-      # fig, ax = plt.subplots()
-      # img = librosa.display.specshow(librosa.amplitude_to_db(np.abs(spec), ref=np.max), y_axis='log', x_axis='time', ax=ax)
-      # ax.set_title('Power spectrogram')
-      # fig.colorbar(img, ax=ax, format="%+2.0f dB")
-      # plt.show()
-
-      if max(data) > CLAP_THRESHOLD:
-         print('clap')
-except KeyboardInterrupt:
-  print("Recording stopped.")
+plt.show()
 
 stream.stop_stream()
 stream.close()

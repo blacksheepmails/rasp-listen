@@ -5,6 +5,7 @@ import librosa
 import pyaudio
 import numpy as np
 import subprocess
+from scipy.signal import find_peaks
 
 def int16_to_float32(int16):
     float32 = int16.astype(np.float32)
@@ -56,14 +57,14 @@ def main():
             data = np.frombuffer(chunk, dtype=np.int16)
             spec = librosa.stft(np.array([int16_to_float32(x) for x in data]))
             single_frame = [max(np.abs(p)) for p in spec]
+            peaks, _ = find_peaks(single_frame[:400], prominence=1)
 
-            if max(single_frame) < VOLUME_THRESHOLD:
+            if len(peaks) == 0:
                 if len(note) >= NOTE_LENGTH:
                     add_note(note, notes, args)
                 note = [0]
             else:
-                i = single_frame.index(max(single_frame))
-                f = librosa.fft_frequencies()[i]
+                f = librosa.fft_frequencies()[peaks[0]]
                 if abs(1 - note[-1] / f) < NOTE_DRIFT_THRESHOLD:
                     debug(f'f:{f}, err:{abs(1 - note[-1] / f):.3f}', args)
                     note.append(f)
