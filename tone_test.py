@@ -106,8 +106,6 @@ def update(_):
       print("Shell Output:", result_shell.stdout)
       debug('YAY')
       notes = []
-  if max(data) > CLAP_THRESHOLD:
-    print('clap')
 
   # update plot
   overtones.remove()
